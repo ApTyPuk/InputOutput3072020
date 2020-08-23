@@ -16,6 +16,7 @@ public class Main {
         //
         // Single letter commands (N, W, S, E, Q) should still be available.
 
+        //startByte = (n - 1) * 30 -> its assume each location occupies 30 bites
 	    Scanner scanner = new Scanner(System.in);
 
 

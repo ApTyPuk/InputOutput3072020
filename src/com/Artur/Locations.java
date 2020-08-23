@@ -5,112 +5,72 @@ import java.util.*;
 
 public class Locations implements Map<Integer, Location> {
     private static Map<Integer, Location> locations = new LinkedHashMap<>();
+    private static Map<Integer, IndexRecord> index = new LinkedHashMap<>();
 
     public static void main(String[] args) throws IOException {
-//        try (DataOutputStream locFile = new DataOutputStream(new BufferedOutputStream(new FileOutputStream("locations.dat")));){
-//            for (Location location : locations.values()) {
-//                locFile.writeInt(location.getLocationID()); //1
-//                locFile.writeUTF(location.getDescription()); //2 //to write a String
-//
-//                System.out.println("Writing location " + location.getDescription() + " : " + location.getDescription());
-//                System.out.println("Writing " + (location.getExits().size() - 1) + " exits.");
-//
-//                locFile.writeInt(location.getExits().size() - 1); //3
-//                for (String direction : location.getExits().keySet()) {
-//                    if (!direction.equalsIgnoreCase("Q")) {
-//                        System.out.println("\t\t" + direction + "," + location.getExits().get(direction));
-//                        locFile.writeUTF(direction); //4
-//                        locFile.writeInt(location.getExits().get(direction)); //5
-//                    }
-//                }
-//            }
-//        }
-        try (ObjectOutputStream locFile = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream("locations.dat")));) {
+        try (RandomAccessFile rao = new RandomAccessFile("locations_rand.dat", "rwd")) {
+            rao.writeInt(locations.size());
+            int indexSize = locations.size() * 3 * Integer.BYTES;
+            int locationStart = (int) (indexSize + rao.getFilePointer() + Integer.BYTES);
+            rao.writeInt(locationStart);
+
+            long indexStart = rao.getFilePointer();
+
+            int startPointer = locationStart;
+            rao.seek(startPointer);
+
             for(Location location : locations.values()){
-                locFile.writeObject(location);
+                rao.writeInt(location.getLocationID());
+                rao.writeUTF(location.getDescription());
+                StringBuilder builder = new StringBuilder();
+                for(String direction : location.getExits().keySet()){
+                    if(!direction.equalsIgnoreCase("Q")){
+                        builder.append(direction);
+                        builder.append(",");
+                        builder.append(location.getExits().get(direction));
+                        builder.append(",");
+                    }
+                }
+                rao.writeUTF(builder.toString());
+
+                IndexRecord record = new IndexRecord(startPointer, (int) (rao.getFilePointer() - startPointer));
+                index.put(location.getLocationID(), record);
+
+                startPointer = (int) rao.getFilePointer();
             }
+
+
+
         }
     }
 
+    //1. This first four bytes will contain the number of locations (bytes 0-3)
+    //2. The next for bytes will contain the start offset of the locations section (bytes 4-7)
+    //3. The next section of the file will contain the index (the index is 1692 bytes long. It will start at byte 8 and end at byte 1699)
+    //4. The final section of the file will contain the location records (the data). It will start at byte 1700.
+
     static {
 
-        try(ObjectInputStream locFile = new ObjectInputStream(new BufferedInputStream(new FileInputStream("locations.dat")))){
+        try(ObjectInputStream locFile = new ObjectInputStream(new BufferedInputStream(new FileInputStream("locations.dat")))) {
             boolean eof = false;    //eof = End Of File
-            while(!eof){
+            while (!eof) {
                 try {
                     Location location = (Location) locFile.readObject();
                     System.out.println("Read location " + location.getLocationID() + " : " + location.getDescription());
                     System.out.println("Found " + location.getExits().size() + " exits");
 
                     locations.put(location.getLocationID(), location);
-                }catch(EOFException e){
+                } catch (EOFException e) {
                     eof = true;
                 }
             }
+        }catch (InvalidClassException e){
+            System.out.println("InvalidClassException " + e.getMessage());
         }catch (IOException io){
             System.out.println("IO exception " + io.getMessage());
         }catch (ClassNotFoundException e){
             System.out.println("ClassNotFoundException " +e.getMessage());
         }
-
-
-//-------------------------------------------------------------------------------------------------
-//        try(DataInputStream locFile = new DataInputStream(new BufferedInputStream(new FileInputStream("locations.dat")))){
-//            boolean eof = false;    //eof = End Of File
-//            while(!eof){
-//                try{
-//                    Map<String, Integer> exits = new LinkedHashMap<>();
-//                    int locID = locFile.readInt();  //1
-//                    String description = locFile.readUTF(); //2
-//                    int numExits = locFile.readInt();   //3
-//                    System.out.println("Read location:" + locID + " : " + description);
-//                    System.out.println("Found " + numExits + " exits.");
-//                    for(int i=0; i<numExits; i++){
-//                        String direction = locFile.readUTF();   //4
-//                        int destination = locFile.readInt();    //5
-//                        exits.put(direction, destination);
-//                        System.out.println("\t\t" + direction + "," + description);
-//                    }
-//                    locations.put(locID, new Location(locID, description, exits));
-//                } catch (EOFException e){
-//                    eof = true;
-//                }
-//            }
-//        }catch (IOException io){
-//            System.out.println("IO exception");
-//
-//        }
-//-------------------------------------------------------------------------------------------------
-//        try(Scanner scanner = new Scanner(new BufferedReader(new FileReader("locations_big.txt")))) {
-//            scanner.useDelimiter(",");
-//            while(scanner.hasNextLine()) {
-//                int loc = scanner.nextInt();
-//                scanner.skip(scanner.delimiter());
-//                String description = scanner.nextLine();
-//                System.out.println("Imported loc: " + loc + ": " + description);
-//                Map<String, Integer> tempExit = new HashMap<>();
-//                locations.put(loc, new Location(loc, description, tempExit));
-//            }
-//        } catch(IOException e) {
-//            e.printStackTrace();
-//        }
-//
-//        // Now read the exits
-//        try(BufferedReader dirFiles = new BufferedReader(new FileReader("directions_big.txt"))) {
-//            String input;
-//            while((input = dirFiles.readLine()) != null) {
-//                String[] data = input.split(",");
-//                int loc = Integer.parseInt(data[0]);
-//                String direction = data[1];
-//                int destination = Integer.parseInt(data[2]);
-//
-//                System.out.println(loc + ": " + direction + ": " + destination);
-//                Location location = locations.get(loc);
-//                location.addExit(direction, destination);
-//            }
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
 
     }
 
